@@ -27,6 +27,9 @@ else:
     CPTA_stdfloat = CPTA_double
     PTA_stdfloat = PTA_double
 
+# Playback framerate to assume when converting animations.
+# This does not affect any actual data
+FRAME_RATE = 24
 
 @dataclass
 class GltfSettings:
@@ -1269,12 +1272,13 @@ class Converter():
                 struct.unpack_from('<f', self.buffers[time_bv['buffer']], idx)[0]
                 for idx in range(start, end, 4)
             ]
-            num_frames = time_acc['count']
+            # glTF records frame time in seconds, not by framerate,
+            # so calculate frame count assuming a standard playback rate
             end_time = time_data[-1]
-            fps = num_frames / time_data[-1] if end_time != 0 else 24
+            num_frames = int(FRAME_RATE * end_time if end_time != 0 else 0)
 
             bundle_name = anim_name
-            bundle = AnimBundle(bundle_name, fps, num_frames)
+            bundle = AnimBundle(bundle_name, FRAME_RATE, num_frames)
 
             if nodeid in self.skeletons and any(chan['target']['path'] != 'weights' for chan in channels):
                 skeleton = AnimGroup(bundle, '<skeleton>')
