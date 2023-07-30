@@ -128,6 +128,9 @@ def main():
         converter.active_scene.ls()
 
     if args.textures == 'copy':
+        # Make sure Panda3d can find what we copy before it loads and writes
+        p3d.getModelPath().appendDirectory(outdir)
+
         textures = [
             texture
             for scene in converter.scenes.values()
@@ -141,8 +144,9 @@ def main():
             texdst = os.path.join(outdir.to_os_specific(), fname)
 
             texture.fullpath = fname
-            os.makedirs(os.path.dirname(texdst), exist_ok=True)
-            shutil.copy(texsrc, texdst)
+            if texsrc != texdst:
+                os.makedirs(os.path.dirname(texdst), exist_ok=True)
+                shutil.copy(texsrc, texdst)
 
     if args.animations == 'separate':
         for bundlenode in converter.active_scene.find_all_matches('**/+AnimBundleNode'):

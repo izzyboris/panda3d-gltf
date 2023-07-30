@@ -572,7 +572,9 @@ class Converter():
             else:
                 uri = urllib.parse.unquote(uri)
                 uri = Filename.from_os_specific(uri)
-                fulluri = Filename(self.filedir, uri)
+                # Use a relative path to the texture from the model file
+                uri.makeRelativeTo(self.filedir)
+                fulluri = Filename(self.filedir, uri.getBasename())
                 texture = TexturePool.load_texture(fulluri, 0, False, LoaderOptions())
                 if not texture:
                     raise RuntimeError(f'failed to load texture: {fulluri}')
