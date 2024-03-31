@@ -123,7 +123,8 @@ class Converter():
     def __init__(
             self,
             filepath,
-            settings=None
+            settings=None,
+            assets_dir=None,
     ):
         if not isinstance(filepath, Filename):
             filepath = Filename.from_os_specific(filepath)
@@ -132,6 +133,9 @@ class Converter():
         self.filepath = filepath
         self.filedir = Filename(filepath.get_dirname())
         self.settings = settings
+        if not isinstance(assets_dir, Filename):
+            assets_dir = Filename.from_os_specific(assets_dir)
+        self.assets_dir = assets_dir
         self.cameras = {}
         self.buffers = {}
         self.lights = {}
@@ -592,6 +596,7 @@ class Converter():
         source = gltf_data['images'][gltf_tex['source']]
         if 'uri' in source:
             uri = source['uri']
+            print(f"img source: {uri}")
             if uri.startswith('data:'):
                 info, b64data = uri.split(',')
 
@@ -609,12 +614,14 @@ class Converter():
                 uri = urllib.parse.unquote(uri)
                 fname = Filename.from_os_specific(uri)
                 if not os.path.isabs(uri):
-                    fulluri = Filename(self.filedir, uri)
+                    fulluri = Filename(self.assets_dir, uri)
                 else:
                     fulluri = fname
+
                 texture = TexturePool.load_texture(fulluri, 0, False, LoaderOptions())
                 if not texture:
                     raise RuntimeError(f'failed to load texture: {fulluri}')
+                print(f"Writing gltf with uri {uri} from {self.filepath} in {self.filedir}")
                 texture.filename = uri
         else:
             name = source.get('name', '')

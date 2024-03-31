@@ -96,6 +96,11 @@ def main():
         help='attempt to flatten resulting node structure'
     )
 
+    parser.add_argument(
+        '--assets-dir',
+        help='directory path asset uris will be made relative to'
+    )
+
     args = parser.parse_args()
 
     settings = GltfSettings(
@@ -118,7 +123,13 @@ def main():
     indir = p3d.Filename(src.get_dirname())
     outdir = p3d.Filename(dst.get_dirname())
 
-    converter = Converter(src, settings=settings)
+    if not args.assets_dir:
+        assets_dir = indir
+    else:
+        assets_dir = p3d.Filename.from_os_specific(args.assets_dir)
+    assets_dir.make_absolute()
+
+    converter = Converter(src, settings=settings, assets_dir=assets_dir)
     gltf_data = parse_gltf_file(src)
     converter.update(gltf_data)
 
@@ -127,20 +138,34 @@ def main():
     if args.print_scene:
         converter.active_scene.ls()
 
-    if args.textures == 'copy':
-        textures = [
-            texture
-            for scene in converter.scenes.values()
-            for texture in scene.find_all_textures()
-            if texture.filename
-        ]
+    # In copy mode from blend2bam, the texture is copied to a temporary
+    # directory. In ref mode, the asset is in its original location
+    # but the fullpath needs to be updated to appear relative to the
+    # written asset after it has been loaded from its original location on disk.
+    textures = [
+        texture
+        for scene in converter.scenes.values()
+        for texture in scene.find_all_textures()
+        if texture.filename
+    ]
 
-        for texture in textures:
-            fname = texture.filename
-            texsrc = os.path.join(indir.to_os_specific(), fname)
-            texdst = os.path.join(outdir.to_os_specific(), fname)
+    for texture in textures:
+        fname = texture.filename
+        texsrc = os.path.join(assets_dir.to_os_specific(), fname)
+        texdst = os.path.join(outdir.to_os_specific(), fname)
 
-            texture.fullpath = fname
+        # In 'ref' mode, the original asset in --assets-dir needs to be copied
+        # to tmpdir for write_to_bam but not copied out. indir is the directory of the gltf file.
+        # During bdist, the 'ref' texture needs to be copied to tmpdir for write_to_bam
+        # to be able to find it. At CLI this is not necessary.
+        # In 'copy', we always try to copy if path ends up different.
+        if args.textures == 'copy' or args.textures == 'ref':
+            # Copy asset to tmpdir so it's available when writing bam file
+            relpath = p3d.Filename(fname)
+            relpath.makeRelativeTo(assets_dir)
+            texture.filename = relpath
+            print(f"Bam file fullpath: {texture.fullpath}, fname: {texture.filename}")
+            print(f"Copying texture {texsrc} to {texdst}")
             if texsrc != texdst:
                 os.makedirs(os.path.dirname(texdst), exist_ok=True)
                 shutil.copy(texsrc, texdst)
@@ -153,6 +178,7 @@ def main():
                 + dst.get_extension()
             bundlenode.write_bam_file(anim_dst)
 
+    print(f"Writing bam file to {dst}")
     converter.active_scene.write_bam_file(dst)
 
 
